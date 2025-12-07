@@ -150,5 +150,23 @@ public final class NotePad {
          * <P>Type: INTEGER (long from System.curentTimeMillis())</P>
          */
         public static final String COLUMN_NAME_MODIFICATION_DATE = "modified";
+
+        /**
+         * Column name for the note category
+         * <P>Type: TEXT</P>
+         */
+        public static final String COLUMN_NAME_CATEGORY = "category";
+
+        /**
+         * Column name for todo completion status
+         * <P>Type: INTEGER (0 = not completed, 1 = completed)</P>
+         */
+        public static final String COLUMN_NAME_IS_COMPLETED = "is_completed";
+
+        /**
+         * Column name for todo priority
+         * <P>Type: TEXT</P>
+         */
+        public static final String COLUMN_NAME_PRIORITY = "priority";
     }
 }

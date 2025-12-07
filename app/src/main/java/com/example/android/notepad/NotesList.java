@@ -23,6 +23,7 @@ import android.content.ClipboardManager;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
@@ -38,6 +39,13 @@ import android.view.ContextMenu.ContextMenuInfo;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
+import android.widget.Button;
+import android.app.AlertDialog;
+import android.widget.EditText;
+import android.content.DialogInterface;
+import android.text.TextUtils;
+import android.widget.CheckBox;
+import android.graphics.Paint;
 
 /**
  * Displays a list of notes. Will display notes from the {@link Uri}
@@ -54,12 +62,22 @@ public class NotesList extends ListActivity {
     // For logging and debugging
     private static final String TAG = "NotesList";
 
+    // Current filter category
+    private String mCurrentCategory = null;
+
+    // Current search query
+    private String mCurrentSearchQuery = null;
+
     /**
      * The columns needed by the cursor adapter
      */
     private static final String[] PROJECTION = new String[] {
             NotePad.Notes._ID, // 0
             NotePad.Notes.COLUMN_NAME_TITLE, // 1
+            NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE, // 2
+            NotePad.Notes.COLUMN_NAME_CATEGORY, // 3
+            NotePad.Notes.COLUMN_NAME_IS_COMPLETED, // 4
+            NotePad.Notes.COLUMN_NAME_PRIORITY, // 5
     };
 
     /** The index of the title column */
@@ -72,8 +90,14 @@ public class NotesList extends ListActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Set the custom layout
+        setContentView(R.layout.notes_list);
+
         // The user does not need to hold down the key to use menu shortcuts.
         setDefaultKeyMode(DEFAULT_KEYS_SHORTCUT);
+
+        // Setup category filter buttons
+        setupCategoryButtons();
 
         /* If no data is given in the Intent that started this Activity, then this Activity
          * was started when the intent filter matched a MAIN action. We should use the default
@@ -95,6 +119,113 @@ public class NotesList extends ListActivity {
          */
         getListView().setOnCreateContextMenuListener(this);
 
+        // Load all notes initially
+        loadNotes(null);
+    }
+
+    private void setupCategoryButtons() {
+        Button btnAll = (Button) findViewById(R.id.btn_all);
+        Button btnUncategorized = (Button) findViewById(R.id.btn_uncategorized);
+        Button btnWork = (Button) findViewById(R.id.btn_work);
+        Button btnLife = (Button) findViewById(R.id.btn_life);
+        Button btnStudy = (Button) findViewById(R.id.btn_study);
+        Button btnTodo = (Button) findViewById(R.id.btn_todo);
+
+        btnAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadNotes(null);
+                updateButtonStyles(v.getId());
+            }
+        });
+
+        btnUncategorized.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadNotes("未分类");
+                updateButtonStyles(v.getId());
+            }
+        });
+
+        btnWork.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadNotes("工作");
+                updateButtonStyles(v.getId());
+            }
+        });
+
+        btnLife.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadNotes("生活");
+                updateButtonStyles(v.getId());
+            }
+        });
+
+        btnStudy.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadNotes("学习");
+                updateButtonStyles(v.getId());
+            }
+        });
+
+        btnTodo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loadNotes("待办");
+                updateButtonStyles(v.getId());
+            }
+        });
+    }
+
+    private void updateButtonStyles(int selectedId) {
+        int[] buttonIds = {R.id.btn_all, R.id.btn_uncategorized, R.id.btn_work,
+                          R.id.btn_life, R.id.btn_study, R.id.btn_todo};
+
+        for (int id : buttonIds) {
+            Button btn = (Button) findViewById(id);
+            if (id == selectedId) {
+                btn.setBackgroundColor(0xFFE91E63); // Pink
+                btn.setTextColor(0xFFFFFFFF); // White
+            } else {
+                btn.setBackgroundColor(0xFFFFFFFF); // White
+                btn.setTextColor(0xFFE91E63); // Pink
+            }
+        }
+    }
+
+    private void loadNotes(String category) {
+        mCurrentCategory = category;
+
+        // Build selection with category and search query
+        StringBuilder selectionBuilder = new StringBuilder();
+        java.util.ArrayList<String> selectionArgsList = new java.util.ArrayList<String>();
+
+        if (category != null) {
+            selectionBuilder.append(NotePad.Notes.COLUMN_NAME_CATEGORY + " = ?");
+            selectionArgsList.add(category);
+        }
+
+        if (mCurrentSearchQuery != null && !mCurrentSearchQuery.isEmpty()) {
+            if (selectionBuilder.length() > 0) {
+                selectionBuilder.append(" AND ");
+            }
+            selectionBuilder.append("(" + NotePad.Notes.COLUMN_NAME_TITLE + " LIKE ? OR " +
+                      NotePad.Notes.COLUMN_NAME_NOTE + " LIKE ?)");
+            String searchPattern = "%" + mCurrentSearchQuery + "%";
+            selectionArgsList.add(searchPattern);
+            selectionArgsList.add(searchPattern);
+        }
+
+        String selection = null;
+        String[] selectionArgs = null;
+        if (selectionBuilder.length() > 0) {
+            selection = selectionBuilder.toString();
+            selectionArgs = selectionArgsList.toArray(new String[selectionArgsList.size()]);
+        }
+
         /* Performs a managed query. The Activity handles closing and requerying the cursor
          * when needed.
          *
@@ -103,38 +234,107 @@ public class NotesList extends ListActivity {
         Cursor cursor = managedQuery(
             getIntent().getData(),            // Use the default content URI for the provider.
             PROJECTION,                       // Return the note ID and title for each note.
-            null,                             // No where clause, return all records.
-            null,                             // No where clause, therefore no where column values.
+            selection,                        // Category and search filter
+            selectionArgs,                    // Category and search values
             NotePad.Notes.DEFAULT_SORT_ORDER  // Use the default sort order.
         );
 
-        /*
-         * The following two arrays create a "map" between columns in the cursor and view IDs
-         * for items in the ListView. Each element in the dataColumns array represents
-         * a column name; each element in the viewID array represents the ID of a View.
-         * The SimpleCursorAdapter maps them in ascending order to determine where each column
-         * value will appear in the ListView.
-         */
+        // Use the common method to set adapter
+        setAdapterFromCursor(cursor);
+    }
 
-        // The names of the cursor columns to display in the view, initialized to the title column
-        String[] dataColumns = { NotePad.Notes.COLUMN_NAME_TITLE } ;
+    /**
+     * Creates and sets the adapter for the ListView from a cursor.
+     * This method is used by both loadNotes and searchNotes to ensure consistent adapter creation.
+     */
+    private void setAdapterFromCursor(Cursor cursor) {
+        // The names of the cursor columns to display in the view
+        String[] dataColumns = { NotePad.Notes.COLUMN_NAME_TITLE, NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE };
+        
+        // The view IDs that will display the cursor columns
+        int[] viewIDs = { android.R.id.text1, R.id.text_date };
+        
+        // Get the ListView
+        final ListView listView = getListView();
+        
+        // Create adapter with custom bindView
+        listView.setAdapter(new SimpleCursorAdapter(this, R.layout.noteslist_item, cursor,
+                dataColumns, viewIDs) {
+            @Override
+            public void bindView(View view, Context context, final Cursor cursor) {
+                super.bindView(view, context, cursor);
+                
+                // Get views
+                CheckBox checkBox = (CheckBox) view.findViewById(R.id.checkbox_completed);
+                android.widget.TextView titleView = (android.widget.TextView) view.findViewById(android.R.id.text1);
+                android.widget.TextView priorityView = (android.widget.TextView) view.findViewById(R.id.text_priority);
+                android.widget.TextView dateView = (android.widget.TextView) view.findViewById(R.id.text_date);
+                
+                // Get data
+                final long noteId = cursor.getLong(cursor.getColumnIndex(NotePad.Notes._ID));
+                String category = cursor.getString(cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_CATEGORY));
+                int isCompleted = cursor.getInt(cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_IS_COMPLETED));
+                String priority = cursor.getString(cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_PRIORITY));
+                long timestamp = cursor.getLong(cursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE));
+                
+                // Format timestamp
+                String dateStr = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss",
+                        java.util.Locale.getDefault()).format(new java.util.Date(timestamp));
+                dateView.setText(dateStr);
+                
+                // Show checkbox and priority only for todo items
+                if ("待办".equals(category)) {
+                    checkBox.setVisibility(View.VISIBLE);
+                    checkBox.setChecked(isCompleted == 1);
+                    
+                    // Handle checkbox click
+                    checkBox.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            toggleTodoCompletion(noteId, ((CheckBox) v).isChecked());
+                        }
+                    });
+                    
+                    // Show priority badge
+                    if (priority != null && !priority.equals("中")) {
+                        priorityView.setVisibility(View.VISIBLE);
+                        priorityView.setText(priority);
+                        if ("高".equals(priority)) {
+                            priorityView.setBackgroundColor(0xFFD32F2F); // Red
+                        } else if ("低".equals(priority)) {
+                            priorityView.setBackgroundColor(0xFF9E9E9E); // Gray
+                        }
+                    } else {
+                        priorityView.setVisibility(View.GONE);
+                    }
+                    
+                    // Apply strikethrough for completed items
+                    if (isCompleted == 1) {
+                        titleView.setPaintFlags(titleView.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+                        titleView.setTextColor(0xFF9E9E9E); // Gray
+                    } else {
+                        titleView.setPaintFlags(titleView.getPaintFlags() & ~Paint.STRIKE_THRU_TEXT_FLAG);
+                        titleView.setTextColor(0xFFE91E63); // Pink
+                    }
+                } else {
+                    checkBox.setVisibility(View.GONE);
+                    priorityView.setVisibility(View.GONE);
+                    titleView.setPaintFlags(titleView.getPaintFlags() & ~Paint.STRIKE_THRU_TEXT_FLAG);
+                    titleView.setTextColor(0xFFE91E63); // Pink
+                }
+            }
+        });
+    }
 
-        // The view IDs that will display the cursor columns, initialized to the TextView in
-        // noteslist_item.xml
-        int[] viewIDs = { android.R.id.text1 };
+    private void toggleTodoCompletion(long noteId, boolean isCompleted) {
+        ContentValues values = new ContentValues();
+        values.put(NotePad.Notes.COLUMN_NAME_IS_COMPLETED, isCompleted ? 1 : 0);
 
-        // Creates the backing adapter for the ListView.
-        SimpleCursorAdapter adapter
-            = new SimpleCursorAdapter(
-                      this,                             // The Context for the ListView
-                      R.layout.noteslist_item,          // Points to the XML for a list item
-                      cursor,                           // The cursor to get items from
-                      dataColumns,
-                      viewIDs
-              );
+        Uri noteUri = ContentUris.withAppendedId(NotePad.Notes.CONTENT_URI, noteId);
+        getContentResolver().update(noteUri, values, null, null);
 
-        // Sets the ListView's adapter to be the cursor adapter that was just created.
-        setListAdapter(adapter);
+        // Refresh the list
+        loadNotes(mCurrentCategory);
     }
 
     /**
@@ -188,7 +388,7 @@ public class NotesList extends ListActivity {
         }
 
         // Gets the number of notes currently being displayed.
-        final boolean haveItems = getListAdapter().getCount() > 0;
+        final boolean haveItems = getListAdapter() != null && getListAdapter().getCount() > 0;
 
         // If there are any notes in the list (which implies that one of
         // them is selected), then we need to generate the actions that
@@ -271,6 +471,12 @@ public class NotesList extends ListActivity {
            */
            startActivity(new Intent(Intent.ACTION_INSERT, getIntent().getData()));
            return true;
+        case R.id.menu_search:
+          /*
+           * Shows a search dialog
+           */
+           showSearchDialog();
+           return true;
         case R.id.menu_paste:
           /*
            * Launches a new Activity using an Intent. The intent filter for the Activity
@@ -282,6 +488,71 @@ public class NotesList extends ListActivity {
         default:
             return super.onOptionsItemSelected(item);
         }
+    }
+
+    private void showSearchDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("搜索笔记");
+
+        final EditText input = new EditText(this);
+        input.setHint("输入标题或内容关键词");
+        input.setPadding(50, 30, 50, 30);
+        builder.setView(input);
+
+        builder.setPositiveButton("搜索", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                String query = input.getText().toString();
+                if (!TextUtils.isEmpty(query)) {
+                    searchNotes(query);
+                }
+            }
+        });
+
+        builder.setNegativeButton("取消", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+    }
+
+    private void searchNotes(String query) {
+        // Save the search query
+        mCurrentSearchQuery = query;
+
+        // Build selection with category and search query
+        StringBuilder selectionBuilder = new StringBuilder();
+        java.util.ArrayList<String> selectionArgsList = new java.util.ArrayList<String>();
+
+        // Add search condition
+        selectionBuilder.append("(" + NotePad.Notes.COLUMN_NAME_TITLE + " LIKE ? OR " +
+                  NotePad.Notes.COLUMN_NAME_NOTE + " LIKE ?)");
+        String searchPattern = "%" + query + "%";
+        selectionArgsList.add(searchPattern);
+        selectionArgsList.add(searchPattern);
+
+        // Add category filter if exists
+        if (mCurrentCategory != null) {
+            selectionBuilder.append(" AND " + NotePad.Notes.COLUMN_NAME_CATEGORY + " = ?");
+            selectionArgsList.add(mCurrentCategory);
+        }
+
+        String selection = selectionBuilder.toString();
+        String[] selectionArgs = selectionArgsList.toArray(new String[selectionArgsList.size()]);
+
+        Cursor cursor = managedQuery(
+            getIntent().getData(),
+            PROJECTION,
+            selection,
+            selectionArgs,
+            NotePad.Notes.DEFAULT_SORT_ORDER
+        );
+
+        // Recreate the adapter with search results
+        setAdapterFromCursor(cursor);
     }
 
     /**

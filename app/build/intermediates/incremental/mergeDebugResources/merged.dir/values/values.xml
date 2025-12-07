@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="categories">
+        <item>未分类</item>
+        <item>工作</item>
+        <item>生活</item>
+        <item>学习</item>
+        <item>待办</item>
+    </string-array>
+    <string-array name="priorities">
+        <item>低</item>
+        <item>中</item>
+        <item>高</item>
+    </string-array>
+    <color name="pink_accent">#FF4081</color>
+    <color name="pink_light">#F8BBD0</color>
+    <color name="pink_lighter">#FCE4EC</color>
+    <color name="pink_primary">#E91E63</color>
+    <color name="pink_primary_dark">#C2185B</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="white">#FFFFFF</color>
+    <string name="app_name">NotePad</string>
+    <string name="button_ok">OK</string>
+    <string name="category_label">分类:</string>
+    <string name="error_message">Error loading note</string>
+    <string name="error_title">Error</string>
+    <string name="live_folder_name">Notes</string>
+    <string name="menu_add">New note</string>
+    <string name="menu_copy">Copy</string>
+    <string name="menu_delete">Delete</string>
+    <string name="menu_open">Open</string>
+    <string name="menu_paste">Paste</string>
+    <string name="menu_revert">Revert changes</string>
+    <string name="menu_save">Save</string>
+    <string name="menu_search">Search</string>
+    <string name="nothing_to_save">There is nothing to save</string>
+    <string name="priority_label">优先级:</string>
+    <string name="resolve_edit">Edit note</string>
+    <string name="resolve_title">Edit title</string>
+    <string name="text_title">Title:</string>
+    <string name="title_create">New note</string>
+    <string name="title_edit">Edit: %1$s</string>
+    <string name="title_edit_title">Note title:</string>
+    <string name="title_notes_list">Notes</string>
+    <style name="ActionBarStyle" parent="android:Widget.Holo.Light.ActionBar">
+        <item name="android:background">@color/pink_primary</item>
+        <item name="android:titleTextStyle">@style/ActionBarTitleText</item>
+    </style>
+    <style name="ActionBarTitleText" parent="android:TextAppearance.Holo.Widget.ActionBar.Title">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="AppTheme" parent="android:Theme.Holo.Light">
+        <item name="android:colorPrimary">@color/pink_primary</item>
+        <item name="android:colorPrimaryDark">@color/pink_primary_dark</item>
+        <item name="android:colorAccent">@color/pink_accent</item>
+        <item name="android:windowBackground">@color/pink_lighter</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:actionBarStyle">@style/ActionBarStyle</item>
+    </style>
+</resources>

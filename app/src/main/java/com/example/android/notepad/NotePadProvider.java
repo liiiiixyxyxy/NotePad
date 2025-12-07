@@ -63,7 +63,7 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
     /**
      * The database version
      */
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 4;
 
     /**
      * A projection map used to select columns from the database
@@ -156,6 +156,18 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
                 NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE,
                 NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE);
 
+        // Maps "category" to "category"
+        sNotesProjectionMap.put(NotePad.Notes.COLUMN_NAME_CATEGORY,
+                NotePad.Notes.COLUMN_NAME_CATEGORY);
+
+        // Maps "is_completed" to "is_completed"
+        sNotesProjectionMap.put(NotePad.Notes.COLUMN_NAME_IS_COMPLETED,
+                NotePad.Notes.COLUMN_NAME_IS_COMPLETED);
+
+        // Maps "priority" to "priority"
+        sNotesProjectionMap.put(NotePad.Notes.COLUMN_NAME_PRIORITY,
+                NotePad.Notes.COLUMN_NAME_PRIORITY);
+
         /*
          * Creates an initializes a projection map for handling Live Folders
          */
@@ -196,7 +208,10 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
                    + NotePad.Notes.COLUMN_NAME_TITLE + " TEXT,"
                    + NotePad.Notes.COLUMN_NAME_NOTE + " TEXT,"
                    + NotePad.Notes.COLUMN_NAME_CREATE_DATE + " INTEGER,"
-                   + NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " INTEGER"
+                   + NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE + " INTEGER,"
+                   + NotePad.Notes.COLUMN_NAME_CATEGORY + " TEXT DEFAULT '未分类',"
+                   + NotePad.Notes.COLUMN_NAME_IS_COMPLETED + " INTEGER DEFAULT 0,"
+                   + NotePad.Notes.COLUMN_NAME_PRIORITY + " TEXT DEFAULT '中'"
                    + ");");
        }
 
@@ -212,13 +227,24 @@ public class NotePadProvider extends ContentProvider implements PipeDataWriter<C
 
            // Logs that the database is being upgraded
            Log.w(TAG, "Upgrading database from version " + oldVersion + " to "
-                   + newVersion + ", which will destroy all old data");
+                   + newVersion);
 
-           // Kills the table and existing data
-           db.execSQL("DROP TABLE IF EXISTS notes");
+           // Handle upgrade from version 2 to 3 (adding category column)
+           if (oldVersion < 3) {
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME +
+                       " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_CATEGORY +
+                       " TEXT DEFAULT '未分类'");
+           }
 
-           // Recreates the database with a new version
-           onCreate(db);
+           // Handle upgrade from version 3 to 4 (adding todo columns)
+           if (oldVersion < 4) {
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME +
+                       " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_IS_COMPLETED +
+                       " INTEGER DEFAULT 0");
+               db.execSQL("ALTER TABLE " + NotePad.Notes.TABLE_NAME +
+                       " ADD COLUMN " + NotePad.Notes.COLUMN_NAME_PRIORITY +
+                       " TEXT DEFAULT '中'");
+           }
        }
    }
 

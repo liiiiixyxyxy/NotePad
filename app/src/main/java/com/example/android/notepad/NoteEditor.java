@@ -37,6 +37,9 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 
 /**
  * This Activity handles "editing" a note, where editing is responding to
@@ -60,7 +63,10 @@ public class NoteEditor extends Activity {
         new String[] {
             NotePad.Notes._ID,
             NotePad.Notes.COLUMN_NAME_TITLE,
-            NotePad.Notes.COLUMN_NAME_NOTE
+            NotePad.Notes.COLUMN_NAME_NOTE,
+            NotePad.Notes.COLUMN_NAME_CATEGORY,
+            NotePad.Notes.COLUMN_NAME_PRIORITY,
+            NotePad.Notes.COLUMN_NAME_IS_COMPLETED
     };
 
     // A label for the saved state of the activity
@@ -77,6 +83,9 @@ public class NoteEditor extends Activity {
     private Cursor mCursor;
     private EditText mText;
     private String mOriginalContent;
+    private Spinner mCategorySpinner;
+    private Spinner mPrioritySpinner;
+    private android.view.View mPriorityContainer;
 
     /**
      * Defines a custom EditText View that draws lines between each line of text that is displayed.
@@ -228,6 +237,41 @@ public class NoteEditor extends Activity {
         // Gets a handle to the EditText in the the layout.
         mText = (EditText) findViewById(R.id.note);
 
+        // Gets a handle to the Spinner for category selection
+        mCategorySpinner = (Spinner) findViewById(R.id.category_spinner);
+        mPrioritySpinner = (Spinner) findViewById(R.id.priority_spinner);
+        mPriorityContainer = findViewById(R.id.priority_container);
+
+        // Set up the category spinner with categories
+        ArrayAdapter<CharSequence> categoryAdapter = ArrayAdapter.createFromResource(
+                this, R.array.categories, android.R.layout.simple_spinner_item);
+        categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mCategorySpinner.setAdapter(categoryAdapter);
+
+        // Set up the priority spinner with priorities
+        ArrayAdapter<CharSequence> priorityAdapter = ArrayAdapter.createFromResource(
+                this, R.array.priorities, android.R.layout.simple_spinner_item);
+        priorityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mPrioritySpinner.setAdapter(priorityAdapter);
+
+        // Add listener to category spinner to show/hide priority
+        mCategorySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, android.view.View view, int position, long id) {
+                String category = parent.getItemAtPosition(position).toString();
+                if ("待办".equals(category)) {
+                    mPriorityContainer.setVisibility(android.view.View.VISIBLE);
+                } else {
+                    mPriorityContainer.setVisibility(android.view.View.GONE);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                mPriorityContainer.setVisibility(android.view.View.GONE);
+            }
+        });
+
         /*
          * If this Activity had stopped previously, its state was written the ORIGINAL_CONTENT
          * location in the saved Instance state. This gets the state.
@@ -289,6 +333,37 @@ public class NoteEditor extends Activity {
             int colNoteIndex = mCursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_NOTE);
             String note = mCursor.getString(colNoteIndex);
             mText.setTextKeepState(note);
+
+            // Gets the category from the Cursor and sets it in the Spinner
+            int colCategoryIndex = mCursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_CATEGORY);
+            String category = mCursor.getString(colCategoryIndex);
+            if (category != null) {
+                String[] categories = getResources().getStringArray(R.array.categories);
+                for (int i = 0; i < categories.length; i++) {
+                    if (categories[i].equals(category)) {
+                        mCategorySpinner.setSelection(i);
+                        break;
+                    }
+                }
+
+                // Show priority container if category is "待办"
+                if ("待办".equals(category)) {
+                    mPriorityContainer.setVisibility(android.view.View.VISIBLE);
+                }
+            }
+
+            // Gets the priority from the Cursor and sets it in the Spinner
+            int colPriorityIndex = mCursor.getColumnIndex(NotePad.Notes.COLUMN_NAME_PRIORITY);
+            String priority = mCursor.getString(colPriorityIndex);
+            if (priority != null) {
+                String[] priorities = getResources().getStringArray(R.array.priorities);
+                for (int i = 0; i < priorities.length; i++) {
+                    if (priorities[i].equals(priority)) {
+                        mPrioritySpinner.setSelection(i);
+                        break;
+                    }
+                }
+            }
 
             // Stores the original note text, to allow the user to revert changes.
             if (mOriginalContent == null) {
@@ -526,6 +601,14 @@ public class NoteEditor extends Activity {
         // Sets up a map to contain values to be updated in the provider.
         ContentValues values = new ContentValues();
         values.put(NotePad.Notes.COLUMN_NAME_MODIFICATION_DATE, System.currentTimeMillis());
+
+        // Get the selected category from the spinner
+        String category = mCategorySpinner.getSelectedItem().toString();
+        values.put(NotePad.Notes.COLUMN_NAME_CATEGORY, category);
+
+        // Get the selected priority from the spinner
+        String priority = mPrioritySpinner.getSelectedItem().toString();
+        values.put(NotePad.Notes.COLUMN_NAME_PRIORITY, priority);
 
         // If the action is to insert a new note, this creates an initial title for it.
         if (mState == STATE_INSERT) {
